@@ -1,5 +1,6 @@
 pub mod binary_tree;
 pub mod tagged_ptr;
+pub mod const_generic_tree;
 
 // let mut tree = Tree::new(NodePtr::new(
 //     0,
