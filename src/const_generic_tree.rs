@@ -18,10 +18,6 @@ pub struct Node<T, const N: usize> {
 }
 
 impl<T, const N: usize> Tree<T, N> {
-    pub fn new(root: *mut Node<T, N>) -> Self {
-        Self { root }
-    }
-
     pub fn dfs_iter_mut(&mut self) -> DfsIterMut<T, N> {
         let iter = NodeIter {
             prev: ptr::null_mut(),
@@ -154,10 +150,9 @@ mod test {
 
     fn assert_dfs_valid<T: Clone + Debug + PartialEq, const N: usize>(
         expected: impl IntoIterator<Item = T>,
-        root: TaggedPtr<Node<T, N>>,
+        mut tree: Tree<T, N>,
     ) {
         let expected: Vec<T> = expected.into_iter().collect();
-        let mut tree = Tree::new(root.as_untagged());
         let actual: Vec<T> = tree.dfs_iter_mut().map(|v| v.clone()).collect();
         assert_eq!(expected, actual);
     }
@@ -178,37 +173,60 @@ mod test {
         node(val, [null(); N])
     }
 
+    fn tree<T, const N: usize>(root: TaggedPtr<Node<T, N>>) -> Tree<T, N> {
+        Tree {
+            root: root.as_untagged(),
+        }
+    }
+
     #[test]
     fn empty() {
-        assert_dfs_valid::<i32, 2>([], null());
+        assert_dfs_valid::<i32, 2>([], tree(null()));
     }
 
     #[test]
     fn one() {
-        assert_dfs_valid::<_, 2>([0], leaf(0));
+        assert_dfs_valid::<_, 2>([0], tree(leaf(0)));
     }
 
     #[test]
     fn two() {
-        assert_dfs_valid([0, 1], node(0, [leaf(1), null()]));
+        assert_dfs_valid([0, 1], tree(node(0, [leaf(1), null()])));
     }
 
     #[test]
     fn basic() {
         assert_dfs_valid(
             0..=5,
-            node(0, [node(1, [leaf(2), null()]), node(3, [leaf(4), leaf(5)])]),
+            tree(node(
+                0,
+                [node(1, [leaf(2), null()]), node(3, [leaf(4), leaf(5)])],
+            )),
         );
     }
 
     #[test]
     fn nochildren() {
-        assert_dfs_valid(["hi"], node("hi", []))
+        assert_dfs_valid(["hi"], tree(node("hi", [])));
     }
 
     #[test]
     fn linked_list() {
         let list = node(0, [node(1, [node(2, [leaf(3)])])]);
-        assert_dfs_valid(0..=3, list);
+        assert_dfs_valid(0..=3, tree(list));
+    }
+
+    #[test]
+    fn iter_fixes_tree() {
+        let mut tree = tree(node(
+            0,
+            [node(1, [leaf(2), null()]), node(3, [leaf(4), leaf(5)])],
+        ));
+        let mut iter = tree.dfs_iter_mut();
+        assert_eq!(Some(&mut 0), iter.next());
+        assert_eq!(Some(&mut 1), iter.next());
+        assert_eq!(Some(&mut 2), iter.next());
+        drop(iter);
+        assert_dfs_valid(0..=5, tree);
     }
 }
