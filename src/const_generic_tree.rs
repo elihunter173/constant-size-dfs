@@ -58,8 +58,28 @@ impl<'tree, T, const N: usize, const RETURN_ON_VISIT: usize> Drop
     for NodeIter<'tree, T, N, RETURN_ON_VISIT>
 {
     fn drop(&mut self) {
-        println!("dropping iter");
-        // TODO: dropping iter needs to fixup the tree
+        // Ascend the tree until we reach the top (i.e. null self.cur) and
+        while let Some(cur) = unsafe { self.cur.as_mut() } {
+            let first_unvisited = cur
+                .children
+                .iter()
+                .position(|node_ptr| !node_ptr.is_seen())
+                .unwrap_or(N);
+
+            if first_unvisited == 0 {
+                // If we haven't visited any children, then our previous node is our parent
+                self.cur = self.prev;
+                self.prev = cur;
+            } else {
+                let parent = cur.children[0];
+                for i in 0..(first_unvisited - 1) {
+                    cur.children[i] = cur.children[i + 1].unseen();
+                }
+                cur.children[first_unvisited - 1] = TaggedPtr::from_untagged(self.prev).unseen();
+                self.cur = parent.as_untagged();
+                self.prev = cur;
+            }
+        }
     }
 }
 
@@ -73,15 +93,15 @@ impl<'tree, T, const N: usize, const RETURN_ON_VISIT: usize> Iterator
             // SAFETY: We're guarnteed the pointers live for the lifespan of 'tree
             let cur: &'tree mut Node<T, N> = unsafe { self.cur.as_mut()? };
 
-            let idx_to_visit = cur
+            let first_unvisited = cur
                 .children
                 .iter()
                 .position(|node_ptr| !node_ptr.is_seen())
                 .unwrap_or(N);
-            if idx_to_visit < N {
+            if first_unvisited < N {
                 // Visit that child
-                let child_to_visit = cur.children[idx_to_visit].as_untagged();
-                cur.children[idx_to_visit] = TaggedPtr::from_untagged(self.prev).seen();
+                let child_to_visit = cur.children[first_unvisited].as_untagged();
+                cur.children[first_unvisited] = TaggedPtr::from_untagged(self.prev).seen();
                 if child_to_visit.is_null() {
                     // Return like we just visited this node
                     self.prev = child_to_visit;
@@ -91,16 +111,23 @@ impl<'tree, T, const N: usize, const RETURN_ON_VISIT: usize> Iterator
                 }
             } else {
                 // Visited all children, go re-construct things and go up.
-                let parent = cur.children[0];
-                for i in 0..(N - 1) {
-                    cur.children[i] = cur.children[i + 1].unseen();
+                if first_unvisited == 0 {
+                    // If we haven't visited any children, then our previous node is our parent
+                    self.cur = self.prev;
+                    self.prev = cur;
+                } else {
+                    let parent = cur.children[0];
+                    for i in 0..(first_unvisited - 1) {
+                        cur.children[i] = cur.children[i + 1].unseen();
+                    }
+                    cur.children[first_unvisited - 1] =
+                        TaggedPtr::from_untagged(self.prev).unseen();
+                    self.cur = parent.as_untagged();
+                    self.prev = cur;
                 }
-                cur.children[N - 1] = TaggedPtr::from_untagged(self.prev).unseen();
-                self.cur = parent.as_untagged();
-                self.prev = cur;
             }
 
-            if idx_to_visit == RETURN_ON_VISIT {
+            if first_unvisited == RETURN_ON_VISIT {
                 return Some(cur);
             }
         }
@@ -172,5 +199,16 @@ mod test {
             0..=5,
             node(0, [node(1, [leaf(2), null()]), node(3, [leaf(4), leaf(5)])]),
         );
+    }
+
+    #[test]
+    fn nochildren() {
+        assert_dfs_valid(["hi"], node("hi", []))
+    }
+
+    #[test]
+    fn linked_list() {
+        let list = node(0, [node(1, [node(2, [leaf(3)])])]);
+        assert_dfs_valid(0..=3, list);
     }
 }

@@ -40,7 +40,7 @@ impl<T> Copy for TaggedPtr<T> {}
 impl<T> TaggedPtr<T> {
     const ALIGN_OK: () = assert!(align_of::<T>() > 1);
 
-    pub fn from_untagged(ptr: *mut T) -> Self {
+    pub const fn from_untagged(ptr: *mut T) -> Self {
         let () = Self::ALIGN_OK;
         Self(ptr)
     }
