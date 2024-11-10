@@ -21,7 +21,13 @@ members = ["."]
 debug = 1
 
 [[bin]]
-name = "array_tree_iter"
-path = "fuzz_targets/array_tree_iter.rs"
+name = "array_tree_reiter"
+path = "fuzz_targets/array_tree_reiter.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "array_tree_halt"
+path = "fuzz_targets/array_tree_halt.rs"
 test = false
 doc = false

@@ -39,6 +39,47 @@ impl<T, const N: usize> Tree<T, N> {
     }
 }
 
+type Fence = u16;
+
+impl<const N: usize> Tree<u8, N> {
+    pub fn arbitrary(data: &[u8]) -> (Self, Vec<u8>) {
+        assert!(data.len() < Fence::MAX as usize, "Fence size is too small");
+        let mut values = Vec::with_capacity(data.len());
+        let root = node_from_arbitrary(data, &mut values);
+        let tree = Self::new(root);
+        (tree, values)
+    }
+}
+
+fn node_from_arbitrary<const N: usize>(
+    data: &[u8],
+    values: &mut Vec<u8>,
+) -> Option<Box<Node<u8, N>>> {
+    let (&val, data) = data.split_first()?;
+    values.push(val);
+
+    let mut children = [const { None }; N];
+    let num_mid_fences = N - 1;
+    let Some((mid_fences, data)) = data.split_at_checked(num_mid_fences * size_of::<Fence>())
+    else {
+        return Some(Node::alloc(val, children));
+    };
+
+    let mut fences = [0; N];
+    *fences.last_mut().unwrap() = data.len();
+    for (i, v) in mid_fences.chunks(size_of::<Fence>()).enumerate() {
+        let v = Fence::from_ne_bytes(v.try_into().unwrap());
+        fences[i + 1] = v as usize % (data.len() + 1);
+    }
+    fences.sort();
+
+    for (i, slot) in children.iter_mut().enumerate() {
+        let range = fences[i]..fences.get(i + 1).copied().unwrap_or(data.len());
+        *slot = node_from_arbitrary(&data[range], values);
+    }
+    Some(Node::alloc(val, children))
+}
+
 fn to_ptr<T>(node: Option<Box<T>>) -> *mut T {
     node.map(|n| Box::leak(n) as *mut _)
         .unwrap_or(ptr::null_mut())
