@@ -1,14 +1,21 @@
 use std::{
-    fmt::Debug,
+    fmt::{self, Debug},
     marker::PhantomData,
     ptr::{self},
 };
 
 use crate::tagged_ptr::TaggedPtr;
 
-#[derive(Debug)]
 pub struct Tree<T> {
     root: *mut Node<T>,
+}
+
+impl<T: Debug> Debug for Tree<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Tree")
+            .field("root", &TaggedPtr::from_untagged(self.root))
+            .finish()
+    }
 }
 
 #[derive(Debug)]

@@ -1,14 +1,21 @@
 use std::{
-    fmt::Debug,
+    fmt::{self, Debug},
     marker::PhantomData,
     ptr::{self},
 };
 
 use crate::tagged_ptr::TaggedPtr;
 
-#[derive(Debug)]
 pub struct Tree<T, const N: usize> {
     root: *mut Node<T, N>,
+}
+
+impl<T: Debug, const N: usize> Debug for Tree<T, N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(&format!("Tree<_, {N}>"))
+            .field("root", &TaggedPtr::from_untagged(self.root))
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -18,6 +25,10 @@ pub struct Node<T, const N: usize> {
 }
 
 impl<T, const N: usize> Tree<T, N> {
+    pub fn new(root: Option<Box<Node<T, N>>>) -> Self {
+        Self { root: to_ptr(root) }
+    }
+
     pub fn dfs_iter_mut(&mut self) -> DfsIterMut<T, N> {
         let iter = NodeIter {
             prev: ptr::null_mut(),
@@ -25,6 +36,24 @@ impl<T, const N: usize> Tree<T, N> {
             lifetime: PhantomData,
         };
         DfsIterMut { iter }
+    }
+}
+
+fn to_ptr<T>(node: Option<Box<T>>) -> *mut T {
+    node.map(|n| Box::leak(n) as *mut _)
+        .unwrap_or(ptr::null_mut())
+}
+
+impl<T, const N: usize> Node<T, N> {
+    pub fn alloc(val: T, children: [Option<Box<Node<T, N>>>; N]) -> Box<Node<T, N>> {
+        let mut converted = [TaggedPtr::from_untagged(ptr::null_mut()); N];
+        for (slot, node) in converted.iter_mut().zip(children) {
+            *slot = TaggedPtr::from_untagged(to_ptr(node));
+        }
+        Box::new(Node {
+            val,
+            children: converted,
+        })
     }
 }
 
