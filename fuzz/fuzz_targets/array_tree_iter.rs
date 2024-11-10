@@ -1,6 +1,6 @@
 #![no_main]
 
-use constant_size_dfs::const_generic_tree::{Node, Tree};
+use constant_size_dfs::array_tree::{Node, Tree};
 use libfuzzer_sys::fuzz_target;
 
 type Fence = u16;
