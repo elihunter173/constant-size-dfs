@@ -38,8 +38,10 @@ fn fuzz<const N: usize>(data: &[u8]) {
     let mut expected = Vec::with_capacity(data.len());
     let root = node_from_arbitrary::<N>(data, &mut expected);
     let mut tree = Tree::new(root);
-    let actual: Vec<_> = tree.dfs_iter_mut().map(|v| *v).collect();
-    assert_eq!(actual, expected);
+    let actual1: Vec<_> = tree.dfs_iter_mut().map(|v| *v).collect();
+    let actual2: Vec<_> = tree.dfs_iter_mut().map(|v| *v).collect();
+    assert_eq!(expected, actual1);
+    assert_eq!(expected, actual2);
 }
 
 fuzz_target!(|data: &[u8]| {
